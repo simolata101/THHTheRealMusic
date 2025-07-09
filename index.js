@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { Player } = require('discord-player');
