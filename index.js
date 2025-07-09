@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+globalThis.crypto = crypto.webcrypto; // <-- this fixes the ReferenceError
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { Player } = require('discord-player');
