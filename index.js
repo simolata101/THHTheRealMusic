@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const { Player } = require('discord-player');
-const playdl = require('play-dl');
+const { DefaultExtractors } = require('@discord-player/extractor'); // <-- NEW
 
 const client = new Client({
   intents: [
@@ -14,7 +14,11 @@ const client = new Client({
 });
 
 const player = new Player(client);
-player.extractors.loadDefault();
+
+// ✅ Load supported extractors
+(async () => {
+  await player.extractors.loadMulti(DefaultExtractors);
+})();
 
 const prefix = "thh!";
 
