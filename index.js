@@ -62,18 +62,30 @@ client.on('messageCreate', async (message) => {
   }
 
   if (cmd === 'play') {
-    if (!args[0]) return message.reply('🔍 Provide a search term or URL.');
-    if (!message.member.voice.channel) return message.reply('🎧 Join a voice channel first!');
+  if (!args[0]) return message.reply('🔍 Provide a search term or URL.');
+  if (!message.member.voice.channel) return message.reply('🎧 Join a voice channel first!');
 
-    let connection = await client.player.getConnection(message.guild.id);
-    if (!connection) {
-      connection = await client.player.createConnection({
-        guildId: message.guild.id,
-        voiceChannelId: message.member.voice.channel.id,
-        textChannelId: message.channel.id,
-        deaf: true
-      });
-    }
+  const player = client.player.createPlayer({
+    guildId: message.guild.id,
+    voiceChannelId: message.member.voice.channel.id,
+    textChannelId: message.channel.id,
+    selfDeaf: true,
+  });
+
+  const results = await client.player.search(args.join(' '));
+  if (!results || !results.tracks.length) return message.reply('❌ No results found.');
+
+  const track = results.tracks[0];
+  player.queue.add(track);
+
+  if (!player.playing && !player.paused) {
+    await player.connect();
+    await player.play();
+  }
+
+  return message.reply(`🎶 Now playing: **${track.info.title}**`);
+}
+
 
     const result = await client.player.search(args.join(' '), {
       requester: message.author
