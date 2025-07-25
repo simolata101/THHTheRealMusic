@@ -1,95 +1,131 @@
+require("dotenv").config(); // <-- Load .env
 
-const crypto = require('crypto');
-globalThis.crypto = crypto.webcrypto;
-process.env.FFMPEG_PATH = require('ffmpeg-static');
-
-require('dotenv').config();
-
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
-const { Player } = require('discord-player');
-const { DefaultExtractors } = require('@discord-player/extractor');
-
-const prefix = 'thh!';
+const { Client, GatewayIntentBits } = require('discord.js');
+const { Player } = require('lavashark');
+const { joinVoiceChannel } = require('@discordjs/voice');
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ],
-  partials: [Partials.Channel]
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.GuildVoiceStates
+  ]
 });
 
-const player = new Player(client);
+client.player = new Player(client, [
+  {
+    name: "Main",
+    url: `http${process.env.LAVALINK_SECURE === 'true' ? 's' : ''}://${process.env.LAVALINK_HOST}:${process.env.LAVALINK_PORT}`,
+    auth: process.env.LAVALINK_PASSWORD,
+    secure: process.env.LAVALINK_SECURE === 'true'
+  }
+]);
 
-(async () => {
-  await player.extractors.loadMulti(DefaultExtractors);
-})();
-
-client.on('ready', () => {
+client.once("ready", () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-client.on('messageCreate', async message => {
-  if (message.author.bot || !message.guild || !message.content.startsWith(prefix)) return;
+client.on("messageCreate", async message => {
+  if (message.author.bot || !message.guild) return;
 
-  const args = message.content.slice(prefix.length).trim().split(/ +/);
-  const cmd = args.shift().toLowerCase();
+  const prefix = "!";
+  if (!message.content.startsWith(prefix)) return;
 
-  // 🎶 Play Command
-  if (cmd === 'play') {
-    const query = args.join(' ');
-    if (!query) return message.channel.send('❌ Please provide a song name or URL.');
+  const args = message.content.slice(prefix.length).trim().split(/\s+/);
+  const command = args.shift().toLowerCase();
 
-    const voiceChannel = message.member.voice.channel;
-    if (!voiceChannel) return message.channel.send('❌ You need to be in a voice channel.');
+  const voiceChannel = message.member.voice.channel;
+  const player = client.player.connections.get(message.guild.id);
 
-    const searchResult = await player.search(query, {
-      requestedBy: message.author
+  if (command === "play") {
+    if (!args.length) return message.reply("🔍 Provide a song name or URL.");
+    if (!voiceChannel) return message.reply("🔊 Join a voice channel first.");
+
+    joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId: message.guild.id,
+      adapterCreator: message.guild.voiceAdapterCreator
     });
 
-    if (!searchResult || !searchResult.tracks.length)
-      return message.channel.send('❌ No results found.');
+    const node = client.player.nodes.get("Main");
+    const search = await node.loadTracks(args.join(" "));
+    if (!search || !search.tracks.length) return message.reply("❌ No results found.");
 
-    const queue = await player.nodes.create(message.guild, {
-      metadata: {
-        channel: message.channel
-      },
-      leaveOnEmpty: false,
-      leaveOnEnd: false,
-      leaveOnStop: false
+    const track = search.tracks[0];
+    const conn = client.player.createConnection({
+      guildId: message.guild.id,
+      voiceChannelId: voiceChannel.id,
+      textChannelId: message.channel.id
     });
 
-    try {
-      if (!queue.connection) await queue.connect(voiceChannel);
-    } catch {
-      player.nodes.delete(message.guild.id);
-      return message.channel.send('❌ Could not join your voice channel.');
-    }
-
-    queue.addTrack(searchResult.tracks[0]);
-    await message.channel.send(`🎵 Now playing: **${searchResult.tracks[0].title}**`);
-
-    if (!queue.isPlaying()) await queue.node.play();
+    await conn.connect();
+    conn.queue.add(track);
+    if (!conn.playing) await conn.play();
+    message.channel.send(`🎶 Now playing: **${track.info.title}**`);
   }
 
-  // ⏹️ Stop command
-  else if (cmd === 'stop') {
-    const queue = player.nodes.get(message.guild.id);
-    if (!queue) return message.channel.send('❌ Nothing is playing.');
-    queue.delete();
-    message.channel.send('🛑 Stopped the music and left the VC.');
+  if (command === "skip") {
+    if (!player || !player.playing) return message.reply("⛔ Nothing is playing.");
+    player.skip();
+    message.channel.send("⏭️ Skipped current track.");
   }
 
-  // ℹ️ Help Command
-  else if (cmd === 'help') {
-    message.channel.send(`
-🎶 **Music Commands**
-\`${prefix}play <song>\` - Play a song from YouTube
-\`${prefix}stop\` - Stop music and leave VC
-\`${prefix}help\` - Show this help menu
-    `);
+  if (command === "stop") {
+    if (!player) return message.reply("🚫 No music to stop.");
+    player.destroy();
+    message.channel.send("🛑 Music stopped and player destroyed.");
+  }
+
+  if (command === "queue") {
+    if (!player || !player.queue.tracks.length) return message.reply("📭 Queue is empty.");
+    const queueList = player.queue.tracks.map((t, i) => `${i + 1}. ${t.info.title}`).join("\n");
+    message.channel.send(`📜 **Queue:**\n${queueList}`);
+  }
+
+  if (command === "volume") {
+    if (!player) return message.reply("⛔ No music is playing.");
+    if (!args[0]) return message.reply(`🔊 Current volume: **${player.volume}%**`);
+    const vol = parseInt(args[0]);
+    if (isNaN(vol) || vol < 0 || vol > 100) return message.reply("⚠️ Volume must be 0-100.");
+    player.setVolume(vol);
+    message.channel.send(`✅ Volume set to **${vol}%**`);
+  }
+
+  if (command === "pause") {
+    if (!player || !player.playing) return message.reply("⛔ No music is playing.");
+    if (player.paused) return message.reply("⏸️ Already paused.");
+    player.pause(true);
+    message.channel.send("⏸️ Playback paused.");
+  }
+
+  if (command === "resume") {
+    if (!player || !player.playing) return message.reply("⛔ No music is playing.");
+    if (!player.paused) return message.reply("▶️ Already playing.");
+    player.pause(false);
+    message.channel.send("▶️ Playback resumed.");
+  }
+
+  if (command === "loop") {
+    if (!player || !player.playing) return message.reply("⛔ No music playing.");
+    player.setRepeatMode(player.repeatMode === 0 ? 1 : 0);
+    message.channel.send(player.repeatMode === 1 ? "🔁 Loop enabled" : "⏹️ Loop disabled");
+  }
+
+  if (command === "join") {
+    if (!voiceChannel) return message.reply("🔊 Join a voice channel first.");
+    joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId: voiceChannel.guild.id,
+      adapterCreator: voiceChannel.guild.voiceAdapterCreator
+    });
+    message.channel.send(`✅ Joined **${voiceChannel.name}**`);
+  }
+
+  if (command === "leave") {
+    if (!player) return message.reply("🚫 Not connected to a voice channel.");
+    player.destroy();
+    message.channel.send("👋 Left the voice channel.");
   }
 });
 
