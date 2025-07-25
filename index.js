@@ -21,7 +21,7 @@ client.player = new LavaShark({
   },
   nodes: [
     {
-      hostname: 'LavaLink V4',
+      hostname: 'process.env.LAVALINK_HOSTNAME',
       host: process.env.LAVALINK_HOST,
       port: Number(process.env.LAVALINK_PORT),
       password: process.env.LAVALINK_PASSWORD,
