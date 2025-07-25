@@ -153,9 +153,5 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// Voice state updates
-client.on('raw', (d) => {
-  client.player.updateVoiceState(d);
-});
 
 client.login(process.env.DISCORD_TOKEN);
