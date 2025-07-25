@@ -12,6 +12,13 @@ const client = new Client({
   ]
 });
 
+console.log("ENV:", {
+  host: process.env.LAVALINK_HOST,
+  port: process.env.LAVALINK_PORT,
+  password: process.env.LAVALINK_PASSWORD,
+  secure: process.env.LAVALINK_SECURE
+});
+
 // Lavashark Setup
 client.player = new LavaShark({
   userID: '0', // Will be set on client ready
