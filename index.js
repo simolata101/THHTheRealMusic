@@ -36,9 +36,9 @@ client.once('ready', () => {
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot || !message.guild) return;
-  if (!message.content.startsWith('!')) return;
+  if (!message.content.startsWith('thh!')) return;
 
-  const args = message.content.slice(1).trim().split(/ +/);
+  const args = message.content.slice(4).trim().split(/ +/);
   const cmd = args.shift().toLowerCase();
 
   if (cmd === 'join') {
