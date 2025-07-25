@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits } = require('discord.js');
 const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
-const LavaShark = require('lavashark');
+const { LavaShark } = require('lavashark');
 
 const client = new Client({
   intents: [
