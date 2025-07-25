@@ -12,32 +12,31 @@ const client = new Client({
   ]
 });
 
-// Lavashark Setup
+// ✅ Initialize lavashark properly (nodes passed here)
 client.player = new LavaShark({
-  userID: '0', // Set in ready event
+  userID: '0', // will set in 'ready' event
   sendWS: (guildId, payload) => {
     const guild = client.guilds.cache.get(guildId);
     if (guild) guild.shard.send(payload);
-  }
+  },
+  nodes: [
+    {
+      name: 'MainNode',
+      url: `${process.env.LAVALINK_HOST}:${process.env.LAVALINK_PORT}`,
+      auth: process.env.LAVALINK_PASSWORD,
+      secure: process.env.LAVALINK_SECURE === 'true'
+    }
+  ]
 });
 
-// Lavalink connection
-client.player.addNode({
-  host: process.env.LAVALINK_HOST,
-  port: Number(process.env.LAVALINK_PORT),
-  password: process.env.LAVALINK_PASSWORD,
-  secure: process.env.LAVALINK_SECURE === 'true'
-});
-
-client.once('ready', () => {
+client.once('ready', async () => {
   client.player.userID = client.user.id;
+  await client.player.connect();
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
 client.on('messageCreate', async (message) => {
-  if (message.author.bot || !message.guild) return;
-  if (!message.content.startsWith('!')) return;
-
+  if (message.author.bot || !message.guild || !message.content.startsWith('!')) return;
   const args = message.content.slice(1).trim().split(/ +/);
   const cmd = args.shift().toLowerCase();
 
@@ -60,34 +59,23 @@ client.on('messageCreate', async (message) => {
 
   if (cmd === 'play') {
     if (!args[0]) return message.reply('🔍 Provide a search term or URL.');
-
     if (!message.member.voice.channel) return message.reply('🎧 Join a voice channel first!');
-    const connection = joinVoiceChannel({
+
+    joinVoiceChannel({
       channelId: message.member.voice.channel.id,
       guildId: message.guild.id,
       adapterCreator: message.guild.voiceAdapterCreator
     });
 
-    let player = client.player.connections.get(message.guild.id);
-    if (!player) {
-      player = client.player.createPlayer({
-        guildId: message.guild.id,
-        voiceChannelId: message.member.voice.channel.id,
-        textChannelId: message.channel.id,
-        selfDeaf: true
-      });
-    }
+    const result = await client.player.load(args.join(' '));
+    if (!result || !result.tracks.length) return message.reply('❌ No results found.');
 
-    const results = await client.player.load(args.join(' '));
-    if (!results || !results.tracks.length) return message.reply('❌ No results found.');
-
-    const track = results.tracks[0];
-    player.queue.add(track);
-
-    if (!player.playing) {
-      player.connect();
-      player.play();
-    }
+    const track = result.tracks[0];
+    const player = await client.player.play(message.guild.id, {
+      track,
+      voiceChannel: message.member.voice.channel.id,
+      textChannel: message.channel.id
+    });
 
     return message.reply(`🎶 Now playing: **${track.info.title}**`);
   }
@@ -123,7 +111,7 @@ client.on('messageCreate', async (message) => {
 
   if (cmd === 'queue') {
     const player = client.player.connections.get(message.guild.id);
-    if (!player || player.queue.tracks.length === 0) return message.reply('📭 The queue is empty.');
+    if (!player || !player.queue.tracks.length) return message.reply('📭 The queue is empty.');
     const list = player.queue.tracks.map((t, i) => `${i + 1}. ${t.info.title}`).join('\n');
     return message.reply(`📜 Queue:\n${list}`);
   }
@@ -145,7 +133,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-// Voice state update for lavashark
+// Needed for lavashark to receive voice updates
 client.on('raw', (d) => {
   client.player.updateVoiceState(d);
 });
