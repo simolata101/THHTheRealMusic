@@ -1,46 +1,4 @@
-Skip to content
-Chat history
 
-You said:
-LavaLink V4
-
-host : gh46.glacierhosting.org
-port : 25583
-pass : youshallnotpass
-source : false
-
-create lavalink host along discord bot connected server 
-ChatGPT said:
-To connect your Discord bot to a LavaLink v4 node, you need to use a music library like LavaShark, Erela.js, or discord-player that supports Lavalink. Below is a complete example using LavaShark, which is a lightweight, modern Lavalink client for Discord.js v14+.
-
-✅ Requirements
-Lavalink server details (you already have):
-
-Host: gh46.glacierhosting.org  
-Port: 25583  
-Password: youshallnotpass  
-Secure: false
-Discord.js v14+ installed
-LavaShark requires Discord.js and Node.js >= 16.9.0
-
-📦 Install Dependencies
-npm install lavashark discord.js @discordjs/voice
-📁 Folder Structure (Basic)
-project/
-├── index.js
-└── config.js
-🔧 config.js
-module.exports = {
-  token: "YOUR_BOT_TOKEN",
-  clientId: "YOUR_BOT_CLIENT_ID",
-  lavalink: {
-    host: "gh46.glacierhosting.org",
-    port: 25583,
-    password: "youshallnotpass",
-    secure: false
-  }
-};
-🚀 index.js
 const { Client, GatewayIntentBits } = require('discord.js');
 const { Player } = require('lavashark');
 const { joinVoiceChannel } = require('@discordjs/voice');
